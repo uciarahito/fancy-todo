@@ -66,7 +66,7 @@ methods.signInFB = function(req, res){
     } else {
       let newUser = new User({
         uuid: id,
-        username: email,
+        username: name,
         name: name,
         email: email
       });
