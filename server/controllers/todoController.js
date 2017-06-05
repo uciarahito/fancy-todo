@@ -1,10 +1,9 @@
 const Todo = require('../models/todo')
 let Helpers = require('../helpers/helpers')
 let methods = {}
+const serverSMS = require('../helpers/serverSMS')
 
 methods.createTodo = (req, res) => {
-  let decoded = Helpers.checkToken(req.headers.token)
-  console.log(decoded);
   let dueDate
   if (req.body.dueDate) {
     dueDate = new Date(req.body.dueDate)
@@ -14,7 +13,7 @@ methods.createTodo = (req, res) => {
   let newTodo = new Todo({
     title: req.body.title,
     content: req.body.content,
-    user: decoded.id,
+    user: req.body.user,
     dueDate: dueDate,
     completedDate: null,
     isCompleted: false
@@ -24,6 +23,15 @@ methods.createTodo = (req, res) => {
     if (err) res.json({err})
     console.log('Create todo success');
     console.log(record);
+
+    Todo.findById(record._id)
+    .populate('user')
+    .exec((err, record) => {
+        console.log('get detail todo success');
+        console.log(record);
+        serverSMS.sendSMS(record)
+    })
+
     res.send(record)
   })
 }
@@ -39,16 +47,16 @@ methods.getAllTodo = (req, res) => {
 }
 
 methods.getAllTodoByUser = (req, res) => {
-  let decoded = Helpers.checkToken(req.headers.token)
+  let id = req.headers.id
   Todo.find({})
   .populate('user')
   .exec((err, todos) => {
-    console.log('get all todo success');
+    console.log('get all todo local success');
     console.log(todos);
     let pushData = []
     todos.forEach(todo => {
       console.log(todo.user._id);
-      if (todo.user._id == decoded.id) {
+      if (todo.user._id == id) {
         pushData.push(todo)
       }
     })
@@ -57,11 +65,11 @@ methods.getAllTodoByUser = (req, res) => {
 }
 
 methods.getDetailTodo = (req, res) => {
-  let decoded = Helpers.checkToken(req.headers.token)
+  let id = req.headers.id
   Todo.findById(req.params.id)
   .populate('user')
   .exec((err, record) => {
-    if (record.user._id == decoded.id) {
+    if (record.user._id == id) {
       console.log('get detail todo success');
       console.log(record);
       res.send(record)
@@ -73,12 +81,13 @@ methods.getDetailTodo = (req, res) => {
 
 methods.editTodo = (req, res) => {
   console.log('mmmmmmmm');
-  let decoded = Helpers.checkToken(req.headers.token)
+  let id = req.headers.id
   Todo.findById(req.params.id)
+  .populate('user')
   .exec((err, record) => {
     console.log('get detail todo success');
     console.log(record);
-    console.log(record.user+' *** '+decoded.id);
+    // console.log(record.user+' *** '+decoded.id);
 
     if (req.body.dueDate) {
       dueDate = new Date(req.body.dueDate)
@@ -91,14 +100,15 @@ methods.editTodo = (req, res) => {
       completedDate = null
     }
 
-    if (record.user == decoded.id) {
+    if (record.user._id == id) {
       Todo.updateOne({
         "_id": record._id
       }, {
         $set: {
           "title": req.body.title || record.title,
           "content": req.body.content || record.content,
-          "user": decoded.id,
+          "user": req.body.user || record.user,
+          "updatedDate": new Date() || record.updatedDate,
           "dueDate": dueDate,
           "completedDate": completedDate,
           "isCompleted": req.body.isCompleted || record.isCompleted
@@ -115,13 +125,13 @@ methods.editTodo = (req, res) => {
 }
 
 methods.deleteTodo = (req, res) => {
-  let decoded = Helpers.checkToken(req.headers.token)
+  let id = req.headers.id
   Todo.findById(req.params.id)
   .populate('user')
   .exec((err, record) => {
     console.log('get detail todo success');
     console.log(record);
-    if (record.user._id == decoded.id) {
+    if (record.user._id == id) {
       Todo.deleteOne({
         "_id": record._id
       })

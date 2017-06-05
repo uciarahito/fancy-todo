@@ -10,6 +10,11 @@
         <el-menu-item index="1" @click="signUpDialog">SignUp</el-menu-item>
       </div>
 
+      <el-menu-item index="1" style="float:right" @click="viewAddTodo" v-show="statusLogin">
+        <el-tooltip class="item" effect="dark" content="Add new todo" placement="bottom-end">
+          <i class="el-icon-plus"></i>
+        </el-tooltip>
+      </el-menu-item>
       <el-submenu index="2" style="float:right" v-show="statusLogin">
        <template slot="title">Welcome, {{userActive}}</template>
        <el-menu-item index="2-2">Profile</el-menu-item>
@@ -52,12 +57,44 @@
         <el-button type="primary" @click="signIn(form_signin);dialogFormVisibleSignin = false;">Confirm</el-button>
       </span>
     </el-dialog>
+    <img src="../assets/bgtd4.jpg" style="width:70%;" v-show="statusLogin === null">
+
+    <el-dialog title="Add new Todo" v-model="dialogFormVisibleAddTodo">
+      <el-form :model="ruleForm" :rules="rules" ref="ruleForm" label-width="120px" class="demo-ruleForm" style="padding:0px 20px 0px 5px;margin-top:10px;">
+        <el-form-item label="Title" prop="name">
+          <el-input v-model="ruleForm.name"></el-input>
+        </el-form-item>
+        <el-form-item label="Description" prop="desc">
+          <el-input type="textarea" v-model="ruleForm.desc"></el-input>
+        </el-form-item>
+        <el-form-item label="Activity time" required>
+          <el-col :span="11">
+            <el-form-item prop="date1">
+              <el-date-picker type="date" placeholder="Pick a date" v-model="ruleForm.date1" style="width: 100%;"></el-date-picker>
+            </el-form-item>
+          </el-col>
+          <el-col class="line" :span="2">-</el-col>
+          <el-col :span="11">
+            <el-form-item prop="date2">
+              <el-time-picker type="fixed-time" placeholder="Pick a time" v-model="ruleForm.date2" style="width: 100%;"></el-time-picker>
+            </el-form-item>
+          </el-col>
+        </el-form-item>
+        <el-form-item style="margin-left:0px;">
+          <el-button type="primary" @click="submitForm('ruleForm')">Create</el-button>
+          <el-button @click="resetForm('ruleForm')">Reset</el-button>
+        </el-form-item>
+      </el-form>
+    </el-dialog>
+
+    <Content v-show="statusLogin"></Content>
 
   </div>
 </template>
 
 <script>
 import { mapGetters, mapActions } from 'vuex'
+import Content from './Content'
 
 // Proses login facebook-sdk
 window.fbAsyncInit = function() {
@@ -96,7 +133,7 @@ function statusChangeCallback(response) {
     FB.api('/me', {fields: 'first_name, name, email'}, function (apiResponse) {
       console.log(apiResponse);
       window.localStorage.setItem('token', response.authResponse.accessToken);
-      window.localStorage.setItem('id', apiResponse.id);
+      window.localStorage.setItem('uuid', apiResponse.id);
       window.localStorage.setItem('user', apiResponse.first_name);
       window.localStorage.setItem('login_method', 'facebook');
       let url = 'http://localhost:3000/signinfb';
@@ -111,6 +148,7 @@ function statusChangeCallback(response) {
         .then((res) => {
           console.log('Tessss');
           console.log(res);
+          window.localStorage.setItem('id', res.data._id);
            window.location = "/"
         })
         .catch((err) => {
@@ -133,6 +171,9 @@ function fb_login(){
 }
 
 export default {
+  components: {
+    Content
+  },
   data() {
     return {
       form_signup: {
@@ -145,8 +186,29 @@ export default {
         username: '',
         password: ''
       },
+      ruleForm: {
+        name: '',
+        date1: '',
+        date2: '',
+        desc: ''
+      },
+      rules: {
+        name: [
+          { required: true, message: 'Please input Activity name', trigger: 'blur' }
+        ],
+        date1: [
+          { type: 'date', required: true, message: 'Please pick a date', trigger: 'change' }
+        ],
+        date2: [
+          { type: 'date', required: true, message: 'Please pick a time', trigger: 'change' }
+        ],
+        desc: [
+          { required: true, message: 'Please input the content', trigger: 'blur' }
+        ]
+      },
       dialogFormVisibleSignup: false,
       dialogFormVisibleSignin: false,
+      dialogFormVisibleAddTodo: false,
       userActive: ''
     }
   },
@@ -174,6 +236,61 @@ export default {
           type: 'success'
         });
       }
+    },
+    viewAddTodo(){
+      this.dialogFormVisibleAddTodo = true
+    },
+    submitForm(formName) {
+      this.$refs[formName].validate((valid) => {
+        if (valid) {
+          // alert('submit!');
+          // let dueDateX = ''
+          // if (this.ruleForm.date1.length > 0 && this.ruleForm.date2.length > 0) {
+          //   dueDateX = new Date(`${this.ruleForm.date1} ${this.ruleForm.date2}:00`)
+          // }
+          // let user = ''
+          // if (window.localStorage.getItem('login_method') === 'facebook') {
+          //   user = window.localStorage.getItem('id')
+          // } else {
+          //   user = window.localStorage.getItem('id')
+          // }
+          let payload = {
+            title: this.ruleForm.name,
+            content: this.ruleForm.desc,
+            dueDate: new Date(`${this.ruleForm.date2}`),
+            user: window.localStorage.getItem('id')
+          }
+          // console.log('data waktu input todo');
+          // console.log(this.ruleForm.date1);
+          // console.log('typeof: ');
+          // console.log(typeof new Date(`${this.ruleForm.date2}`));
+          console.log(payload);
+          this.$store.dispatch('addTodo', payload)
+          this.ruleForm.name = ''
+          this.ruleForm.desc = ''
+          this.ruleForm.date1 = ''
+          this.ruleForm.date2 = ''
+          this.dialogFormVisibleAddTodo = false
+        } else {
+          console.log('error add new todo!!');
+          return false;
+        }
+      });
+    },
+    resetForm(formName) {
+      this.$refs[formName].resetFields();
+    },
+    addTodo() {
+      let dueDateX = ''
+      if (this.ruleForm.date1.length > 0 && this.ruleForm.date2.length > 0) {
+        dueDateX = new Date(this.ruleForm.date2)
+      }
+      let payload = {
+        title: this.ruleForm.name,
+        content: this.ruleForm.desc,
+        dueDate: dueDateX
+      }
+      this.$store.dispatch('addTodo', payload)
     }
   },
   computed: {

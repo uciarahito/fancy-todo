@@ -12,6 +12,10 @@ let todoSchema = new Schema({
     type: Date,
     default: Date.now()
   },
+  updatedDate: {
+    type: Date,
+    default: Date.now()
+  },
   dueDate: Date,
   completedDate: Date,
   isCompleted: Boolean
